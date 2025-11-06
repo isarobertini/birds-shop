@@ -21,7 +21,7 @@ function App() {
       <Picture />
 
       <div className='bg-amber-200'>
-        <h3>subsub</h3>
+        <h3>subsub!!</h3>
       </div>
 
       <div className='bg-green-200'>
