@@ -1,0 +1,1 @@
+import { birdSchema } from "../models/birdModel"
