@@ -4,14 +4,18 @@ import Cart from "../models/cartModel.js";
 // POST a new bird to the shop
 export const postBird = async (req, res) => {
     try {
-        const { name, size, material, amount, price, description, image } = req.body;
+        const { name, size, material, amount, price, description } = req.body;
 
-        // Return 400 if any required field is missing
+        // Validate required text fields
         if (!name || !size || !amount || !price) {
             return res.status(400).json({ error: "Missing required field" });
         }
 
-        // Create a new bird document
+        // Validate image upload
+        if (!req.file) {
+            return res.status(400).json({ error: "Image is required" });
+        }
+
         const newBird = new Bird({
             name,
             size,
@@ -22,7 +26,6 @@ export const postBird = async (req, res) => {
             image: req.file.path
         });
 
-        // Save to database
         const savedBird = await newBird.save();
         res.status(201).json(savedBird);
 
@@ -32,10 +35,11 @@ export const postBird = async (req, res) => {
     }
 };
 
+
 // GET all birds
 export const getBirds = async (req, res) => {
     try {
-        const birds = await Bird.find();
+        const birds = await Bird.find().sort({ createdAt: -1 });
         res.json(birds);
     } catch (error) {
         console.error("Error fetching birds:", error);
@@ -43,22 +47,55 @@ export const getBirds = async (req, res) => {
     }
 };
 
+
+// GET the cart for guest (or later, a real user)
+export const getCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        let cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            cart = new Cart({ user: userId, items: [] });
+            await cart.save();
+        }
+
+        res.json(cart);
+    } catch (error) {
+        console.error("Error fetching cart:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
+
+
+//GET a bird by id
+export const getBirdbyId = async (req, res) => {
+    try {
+        const bird = await Bird.findById(req.params.id);
+        if (!bird) return res.status(404).json({ message: "Bird not found" });
+        res.json(bird);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+}
+
 // PUT a bird into the user's cart (add or increment quantity)
 export const buyBird = async (req, res) => {
     try {
         const { birdId } = req.params;
-        const { quantity = 1, userId } = req.body;
+        const { quantity = 1 } = req.body;
+        const userId = req.user._id;
 
-        // Find the bird
         const bird = await Bird.findById(birdId);
         if (!bird) return res.status(404).json({ error: "Bird not found" });
 
-        // Find or create the user's cart
         let cart = await Cart.findOne({ user: userId });
         if (!cart) cart = new Cart({ user: userId, items: [] });
 
-        // Check if bird is already in cart
-        const itemIndex = cart.items.findIndex(item => item.birdId.toString() === birdId);
+        const itemIndex = cart.items.findIndex(
+            item => item.birdId.toString() === birdId
+        );
 
         if (itemIndex > -1) {
             cart.items[itemIndex].quantity += parseInt(quantity);
@@ -67,12 +104,13 @@ export const buyBird = async (req, res) => {
                 birdId: bird._id,
                 name: bird.name,
                 price: bird.price,
+                image: bird.image,
                 quantity: parseInt(quantity),
             });
         }
 
-        const updatedCart = await cart.save();
-        res.json(updatedCart);
+        await cart.save();
+        res.json(cart);
 
     } catch (error) {
         console.error("Error adding bird to cart:", error);
@@ -80,45 +118,53 @@ export const buyBird = async (req, res) => {
     }
 };
 
+
 // PATCH to update quantity of a bird in cart
 export const updateCartQuantity = async (req, res) => {
     try {
         const { birdId } = req.params;
-        const { quantity, userId } = req.body;
+        const { quantity } = req.body;
+        const userId = req.user._id;
 
         const qty = parseInt(quantity);
-        if (!qty || qty < 1) return res.status(400).json({ error: "Invalid quantity" });
+        if (!qty || qty < 1) {
+            return res.status(400).json({ error: "Invalid quantity" });
+        }
 
         const cart = await Cart.findOne({ user: userId });
         if (!cart) return res.status(404).json({ error: "Cart not found" });
 
-        const itemIndex = cart.items.findIndex(item => item.birdId.toString() === birdId);
-        if (itemIndex === -1) return res.status(404).json({ error: "Bird not in cart" });
+        const item = cart.items.find(
+            item => item.birdId.toString() === birdId
+        );
+        if (!item) return res.status(404).json({ error: "Bird not in cart" });
 
-        cart.items[itemIndex].quantity = qty;
+        item.quantity = qty;
+        await cart.save();
 
-        const updatedCart = await cart.save();
-        res.json(updatedCart);
-
+        res.json(cart);
     } catch (error) {
         console.error("Error updating cart quantity:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
 
+
 // DELETE a bird from the cart
 export const deleteBirdCart = async (req, res) => {
     try {
         const { birdId } = req.params;
-        const { userId } = req.body;
+        const userId = req.user._id;
 
         const cart = await Cart.findOne({ user: userId });
         if (!cart) return res.status(404).json({ error: "Cart not found" });
 
-        cart.items = cart.items.filter(item => item.birdId.toString() !== birdId);
+        cart.items = cart.items.filter(
+            item => item.birdId.toString() !== birdId
+        );
 
         await cart.save();
-        res.status(200).json({ message: "Bird removed from cart successfully!" });
+        res.json({ message: "Bird removed from cart" });
 
     } catch (error) {
         console.error("Error deleting bird from cart:", error);
@@ -129,14 +175,11 @@ export const deleteBirdCart = async (req, res) => {
 // DELETE the entire cart
 export const deleteCart = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.user._id;
 
-        const cart = await Cart.findOne({ user: userId });
-        if (!cart) return res.status(404).json({ error: "Cart not found" });
+        await Cart.findOneAndDelete({ user: userId });
 
-        await cart.deleteOne();
-        res.status(200).json({ message: "Cart deleted successfully!" });
-
+        res.json({ message: "Cart deleted successfully" });
     } catch (error) {
         console.error("Error deleting cart:", error);
         res.status(500).json({ error: "Server error" });
@@ -146,12 +189,30 @@ export const deleteCart = async (req, res) => {
 // Simulated checkout (no real payment yet)
 export const checkoutCart = async (req, res) => {
     try {
-        const userId = req.body.userId || "guest"; // Use "guest" if no userId provided
+        const userId = req.user._id;
+
         res.json({
-            message: `Checkout simulation for user ${userId}. Payment functionality under development.`
+            message: `Checkout simulation for user ${userId}`
         });
     } catch (error) {
-        console.error("Error during checkout:", error);
+        console.error("Checkout error:", error);
         res.status(500).json({ error: "Server error during checkout" });
+    }
+};
+
+
+// DELETE a bird from the shop (owner action)
+export const deleteBird = async (req, res) => {
+    try {
+        const birdId = req.params.id;
+
+        const bird = await Bird.findById(birdId);
+        if (!bird) return res.status(404).json({ error: "Bird not found" });
+
+        await bird.deleteOne();
+        res.status(200).json({ message: "Bird deleted successfully" });
+    } catch (err) {
+        console.error("Error deleting bird:", err);
+        res.status(500).json({ error: "Server error" });
     }
 };

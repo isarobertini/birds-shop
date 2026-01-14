@@ -6,10 +6,12 @@ import mongoose from "mongoose";
 import cors from "cors";
 
 import birdRouter from "./routes/birdRouter.js";
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 
 // CORS setup
@@ -28,6 +30,7 @@ app.get("/", (req, res) => {
 
 // API routes
 app.use("/api/birds", birdRouter);
+app.use("/api/auth", authRoutes);
 
 // Connect to MongoDB
 mongoose

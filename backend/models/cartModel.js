@@ -6,6 +6,7 @@ const cartItemSchema = new mongoose.Schema({
     birdId: { type: mongoose.Schema.Types.ObjectId, ref: "Bird", required: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },
+    image: { type: String, required: true },
     quantity: { type: Number, default: 1 },
 });
 
