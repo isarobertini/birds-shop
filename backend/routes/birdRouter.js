@@ -1,6 +1,6 @@
 import express from "express";
 import { parser } from "../config/cloudinary.js";
-import { buyBird, checkoutCart, deleteBirdCart, deleteCart, getBirdbyId, getBirds, getCart, postBird, updateCartQuantity, deleteBird } from "../controllers/birdController.js";
+import { buyBird, checkoutCart, deleteBirdCart, deleteCart, getBirdbyId, getBirds, getCart, postBird, updateCartQuantity, deleteBird, updateBird } from "../controllers/birdController.js";
 import { authenticationUser } from "../middleware/authenticateUser.js";
 import { adminOnly } from "../middleware/adminOnly.js";
 
@@ -35,6 +35,9 @@ router.put("/cart", authenticationUser, checkoutCart);
 
 // DELETE bird (owner)
 router.delete("/:id", authenticationUser, adminOnly, deleteBird);
+
+// PATCH /birds/:id — admin updates bird info
+router.patch("/:id", authenticationUser, adminOnly, updateBird);
 
 export default router;
 

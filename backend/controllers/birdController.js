@@ -48,19 +48,29 @@ export const getBirds = async (req, res) => {
 };
 
 
-// GET the cart for guest (or later, a real user)
+// GET the cart for a user, including stock info
 export const getCart = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        let cart = await Cart.findOne({ user: userId });
+        let cart = await Cart.findOne({ user: userId }).lean();
 
         if (!cart) {
-            cart = new Cart({ user: userId, items: [] });
-            await cart.save();
+            cart = { user: userId, items: [] };
         }
 
-        res.json(cart);
+        // Enrich each cart item with the bird's available amount
+        const itemsWithStock = await Promise.all(
+            cart.items.map(async (item) => {
+                const bird = await Bird.findById(item.birdId).lean();
+                return {
+                    ...item,
+                    maxQuantity: bird ? bird.amount : 10, // fallback if bird not found
+                };
+            })
+        );
+
+        res.json({ ...cart, items: itemsWithStock });
     } catch (error) {
         console.error("Error fetching cart:", error);
         res.status(500).json({ error: "Server error" });
@@ -216,3 +226,29 @@ export const deleteBird = async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 };
+
+// PATCH /birds/:id — update bird info (admin only)
+export const updateBird = async (req, res) => {
+    try {
+        const birdId = req.params.id;
+        const { name, price, amount, material, size, description } = req.body;
+
+        const bird = await Bird.findById(birdId);
+        if (!bird) return res.status(404).json({ error: "Bird not found" });
+
+        // Update only the provided fields
+        if (name !== undefined) bird.name = name;
+        if (price !== undefined) bird.price = price;
+        if (amount !== undefined) bird.amount = amount;
+        if (material !== undefined) bird.material = material;
+        if (size !== undefined) bird.size = size;
+        if (description !== undefined) bird.description = description;
+
+        await bird.save();
+        res.json({ message: "Bird updated successfully", bird });
+    } catch (err) {
+        console.error("Error updating bird:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
