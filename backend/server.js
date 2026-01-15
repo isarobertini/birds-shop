@@ -10,18 +10,25 @@ import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
-// Middleware 
-app.use(cors());
-app.use(express.json());
+// CORS (single, correct setup)
+const allowedOrigins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    process.env.FRONTEND_URL
+];
 
-// CORS setup
-if (process.env.NODE_ENV === "production") {
-    // Only allow your frontend in production
-    app.use(cors({ origin: process.env.FRONTEND_URL }));
-} else {
-    // Allow all origins in development
-    app.use(cors());
-}
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true
+}));
+
+app.use(express.json());
 
 // Default route
 app.get("/", (req, res) => {
@@ -32,7 +39,7 @@ app.get("/", (req, res) => {
 app.use("/api/birds", birdRouter);
 app.use("/api/auth", authRoutes);
 
-// Connect to MongoDB
+// MongoDB
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => console.log("✅ Connected to MongoDB"))
@@ -41,5 +48,5 @@ mongoose
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
-    console.log(`🚀 Server running at http://localhost:${PORT}`)
+    console.log(`🚀 Server running on port ${PORT}`)
 );
