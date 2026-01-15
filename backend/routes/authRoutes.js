@@ -6,7 +6,7 @@ const router = express.Router();
 // POST /api/auth/register → create shopper
 router.post("/register", registerUser);
 
-// POST /api/auth/login → login owner or shopper
+// POST /api/auth/login → login admin
 router.post("/login", loginUser);
 
 export default router;
