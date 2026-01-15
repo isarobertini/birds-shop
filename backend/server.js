@@ -10,19 +10,20 @@ import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
-// CORS (single, correct setup)
+// CORS setup
 const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    process.env.FRONTEND_URL
+    "http://localhost:3000", // React dev server
+    "http://localhost:5173", // Vite dev server
+    process.env.FRONTEND_URL || "https://biiiiiiirds.netlify.app" // production frontend
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        // allow requests with no origin (like Postman)
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error("Not allowed by CORS"));
+            callback(new Error(`CORS policy: origin ${origin} not allowed`));
         }
     },
     credentials: true
@@ -39,7 +40,7 @@ app.get("/", (req, res) => {
 app.use("/api/birds", birdRouter);
 app.use("/api/auth", authRoutes);
 
-// MongoDB
+// MongoDB connection
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => console.log("✅ Connected to MongoDB"))
